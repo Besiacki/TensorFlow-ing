@@ -41,10 +41,10 @@ def shuffle_dataset(dataset: pd.DataFrame ,frac: float = 1, random_state: int = 
     Returns:
         pd.DataFrame: _description_
     """
-    return dataset.sample(frac=frac, random_state=random_state).reset_index(drop=False)
+    return dataset.sample(frac=frac, random_state=random_state).reset_index(drop=drop)
     
     
-def prepare_data(df: pd.DataFrame, target_column_index: int = 0) -> Tuple[np.ndarray, np.ndarray]:
+def prepare_data(df: pd.DataFrame, target_column_index: int = 0) -> Tuple[np.ndarray, np.ndarray, int]:
     """
     Separates features (X) and targets (y), and performs One-Hot Encoding on the target.
     
@@ -53,7 +53,7 @@ def prepare_data(df: pd.DataFrame, target_column_index: int = 0) -> Tuple[np.nda
         target_column_index (int, optional): Index of the column containing labels. Defaults to 0 (first column).
 
     Returns:
-        Tuple[np.ndarray, np.ndarray]: A tuple containing (X_features, y_encoded_targets).
+        Tuple[np.ndarray, np.ndarray, int]: A tuple containing (X_features, y_encoded_targets, num_classes).
     """
     # 1. Separate Features (X)
     X = df.drop(df.columns[target_column_index], axis=1).values
@@ -70,7 +70,7 @@ def prepare_data(df: pd.DataFrame, target_column_index: int = 0) -> Tuple[np.nda
     y_encoded = tf.keras.utils.to_categorical(y_shifted, num_classes=num_classes)
     
     print(f"Data Prepared: Features shape: {X.shape}, Targets shape: {y_encoded.shape}")
-    return X, y_encoded
+    return X, y_encoded, num_classes
 
 def split_dataset(X: np.ndarray, y: np.ndarray, split_ratio: float = 0.8) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
@@ -99,20 +99,22 @@ def split_dataset(X: np.ndarray, y: np.ndarray, split_ratio: float = 0.8) -> Tup
 
 # ----- Model and visualization functions -----
 
-def build_model_v1(input_shape: int, num_classes: int) -> tf.keras.Model:
+def build_model_v1(input_shape: int, num_classes: int, normalizer: tf.keras.layers.Layer) -> tf.keras.Model:
     """Builds a simple sequential neural network model (Version 1).
 
-    Architecture: Input -> Dense(16, ReLU) -> Output(Softmax).
+    Architecture: Input -> Normalization -> Dense(16, ReLU) -> Output(Softmax).
 
     Args:
         input_shape (int): The number of input features.
         num_classes (int): The number of output classes.
+        normalizer (tf.keras.layers.Layer): The adapted normalization layer.
 
     Returns:
         tf.keras.Model: A compiled Keras model ready for training.
     """
     model = tf.keras.Sequential([
         tf.keras.layers.InputLayer(input_shape=(input_shape,)),
+        normalizer,
         tf.keras.layers.Dense(16, activation='relu', name='Hidden_Layer_ReLu'),
         tf.keras.layers.Dense(num_classes, activation='softmax', name='Output_Softmax')
     ], name="Model_V1_Simple")
@@ -123,20 +125,22 @@ def build_model_v1(input_shape: int, num_classes: int) -> tf.keras.Model:
     return model
 
 
-def build_model_v2(input_shape: int, num_classes: int) -> tf.keras.Model:
+def build_model_v2(input_shape: int, num_classes: int, normalizer: tf.keras.layers.Layer) -> tf.keras.Model:
     """Builds a deeper neural network model with He initialization (Version 2).
 
-    Architecture: Input -> Dense(64, ReLU, He) -> Dense(32, Tanh) -> Output(Softmax).
+    Architecture: Input -> Normalization -> Dense(64, ReLU, He) -> Dense(32, Tanh) -> Output(Softmax).
 
     Args:
         input_shape (int): The number of input features.
         num_classes (int): The number of output classes.
+        normalizer (tf.keras.layers.Layer): The adapted normalization layer.
 
     Returns:
         tf.keras.Model: A compiled Keras model ready for training.
     """
     model = tf.keras.Sequential([
         tf.keras.layers.InputLayer(input_shape=(input_shape,)),
+        normalizer,
         tf.keras.layers.Dense(64, activation='relu', kernel_initializer='he_uniform', name='Hidden_1_He'),
         tf.keras.layers.Dense(32, activation='tanh', name='Hidden_2_Tanh'),
         tf.keras.layers.Dense(num_classes, activation='softmax', name='Output')
@@ -211,7 +215,10 @@ def plot_history(history: tf.keras.callbacks.History, title: str = "Model Traini
     plt.legend(loc='upper right')
     plt.title(f'{title} - Loss')
     
-    plt.show()
+    filename = title.replace(" ", "_").lower() + ".png"
+    plt.savefig(filename)
+    print(f"Saved plot: {filename}")
+    plt.close()
 
 
 # --- MAIN EXECUTION ---
@@ -243,14 +250,18 @@ def main() -> None:
         X_train, y_train, X_test, y_test = split_dataset(X, y)
         
         input_shape = X_train.shape[1]
+        
+        # Create and adapt Normalization layer
+        normalizer = tf.keras.layers.Normalization(axis=-1)
+        normalizer.adapt(X_train)
 
         # Model V1
-        model_v1 = build_model_v1(input_shape, num_classes)
+        model_v1 = build_model_v1(input_shape, num_classes, normalizer)
         history_v1 = train_model(model_v1, X_train, y_train, X_test, y_test, args.epochs, args.batch)
         plot_history(history_v1, title="Model V1 (Simple)")
         
         # Model V2
-        model_v2 = build_model_v2(input_shape, num_classes)
+        model_v2 = build_model_v2(input_shape, num_classes, normalizer)
         history_v2 = train_model(model_v2, X_train, y_train, X_test, y_test, args.epochs, args.batch)
         plot_history(history_v2, title="Model V2 (Deep)")
         
