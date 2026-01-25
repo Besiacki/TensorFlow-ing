@@ -9,7 +9,6 @@ def rotate_point(point: list, angle_degrees: float) -> tf.Tensor:
     """
     angle_radians = tf.cast(angle_degrees * (np.pi / 180.00), dtype=tf.float32)
     
-    # Fixed: applied radians to cos as well
     cos_a = tf.cos(angle_radians)
     sin_a = tf.sin(angle_radians)
     
