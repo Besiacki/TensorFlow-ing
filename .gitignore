@@ -15,4 +15,6 @@ __pycache__/
 
 # macos
 .DS_Store
-.keras
+*.keras
+
+lab4/tuner_dir
