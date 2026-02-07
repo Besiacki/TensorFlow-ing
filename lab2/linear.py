@@ -19,11 +19,11 @@ def rotate_point(point: list, angle_degrees: float) -> tf.Tensor:
     
     point_tensor = tf.convert_to_tensor(point, dtype=tf.float32)
     if len(point_tensor.shape) == 1:
-        point_tensor = tf.expand_dims(point_tensor, 1)
+        point_tensor = tf.expand_dims(point_tensor, 1) # [x,y] -> [[x],[y]]
 
     new_point = tf.matmul(rotation_matrix, point_tensor)
 
-    return tf.squeeze(new_point)
+    return tf.squeeze(new_point) # [[x],[y]] -> [x,y]
 
 @tf.function
 def solve_linear_tf_func(A_tf: tf.Tensor, b_tf: tf.Tensor) -> tf.Tensor:
@@ -116,6 +116,7 @@ def main():
         print("--- Result ---")
         print(f"New point: {new_point.numpy()}")
         
+        
         print("\n--- Automatic Test ---")
         test_p = [1.0, 0.0]
         test_a = 90.0
@@ -142,7 +143,6 @@ def main():
         print("\nVector b:")
         print(vector_b)
 
-        # Fixed: Correct function name used here
         solution = check_dim_and_solve(matrix_A, vector_b)
         
         if solution is not None:
@@ -160,3 +160,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+    #python linear.py rotate --point 1 5 --angle 90
+    #python linear.py solve --data 2 1 1 -1 5 1
+    
